@@ -5,6 +5,7 @@
 
 #define N_DIGITS 4
 #define N_SELECT 3
+#define DECIMAL_PLACES 2
 #define DEFAULT_WHEEL_CIRCUMFERENCE 2.105
 
 
@@ -42,6 +43,10 @@ const int DEM_2 = 13; // B5
 const int DEM_OFFSET = DEM_0 - 8;
 const int BCD_OFFSET = OUT_A - 14;
 
+// Mapping of digit displays
+// Change according to map - ensure each digit [0 - 7] appears only once
+int digitMap[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+
 double circum;
 double velocity = 0;
 int seconds = 0;
@@ -78,11 +83,28 @@ void setup() {
 
   circum = DEFAULT_WHEEL_CIRCUMFERENCE;
   seconds = 0;
+
+  
+
+  attachInterrupt(SENS, updateSens, RISING);
+  attachInterrupt(RESET, reset, RISING);
+  attachInterrupt(SETTINGS, changeSetting, RISING);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   
+}
+
+void updateSens() {
+  //TBD
+}
+
+/*
+ *  Resets 
+ */ 
+void reset() {
+  //TBD
 }
 
 /*
@@ -93,13 +115,33 @@ void displayValue(char *input, int displayN) {
   int decimal;
   for(int i = 0; i < N_DIGITS; i++) {
     decimal = 0;
-    setD(i + (displayN * N_DIGITS));
+    setD(digitMap[i] + (displayN * N_DIGITS));
     if(i == 1) {
       decimal = 1;
     }
     setA(input[i], decimal);
   }
 }
+
+/*
+ *  Updates setting
+ */
+void changeSetting() {
+  //TBD
+}
+
+/*
+ *  Formats number into a 4 digit display format
+ *  
+ */
+void formatOutput(float number, char *array) {
+  int truncated = (int) (number * pow(10, DECIMAL_PLACES));
+  for(int i = 0; i < N_DIGITS; i++) {
+    array[N_DIGITS - i - 1] = truncated % 10;
+    truncated = truncated / 10;
+  }
+}
+
 
 /*
  * Sets BCD output for a digit on 7 segment display + decimal
