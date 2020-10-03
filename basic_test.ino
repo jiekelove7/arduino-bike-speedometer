@@ -1,9 +1,14 @@
 /**
- * Basic test - Rotary not fully implemented
+ * Basic test - Rotary not fully implemented, timer not implemented
+ * This variation uses the loop to display digits
  * Tests multiplexer + 4 digit displays
+ * @version 1.4
  * 
  * Changelog:
- *  29/9 - Added ability to map digits
+ *  29/9  -   Added ability to map digits
+ *  30/9  -   Adjusted various lines for easier readability
+ *  1/10  -   Fixed issue where BCD was mapped to Port D instead of Port C
+ *  2/10  -   Added global digit select variable - 1 digit is displayed per loop instead
  */
 #include <avr/io.h>
 
@@ -45,7 +50,7 @@ const int BCD_OFFSET = OUT_A - 14;
 // Mapping of digit displays
 // Change according to map - ensure each digit [0 - 7] appears only once
 int digitMap[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-
+int digitSelect;
 
 // may require volatile if modified during button press instead of loop
 char num[N_DIGITS];
@@ -61,8 +66,7 @@ volatile int debugsetting;
 
 void setup() {
 
-  // Sets B
-  //DDRB &= 0b11111110; // B0 as input (SENS)
+  // Sets Inputs
   pinMode(SENS, INPUT);
 
   pinMode(ENCA, INPUT);
@@ -70,10 +74,20 @@ void setup() {
   pinMode(RESET, INPUT);
   pinMode(SETTINGS, INPUT);
 
-  DDRB |= 0b00111110; // B1 - B5 as output
-  PORTB &= 0b11000001;
-  DDRD |= 0b00110000; // D4, D5 as output
-  PORTD &= 0b11001111; 
+ 
+
+  // DDRB |= 0b00111110; // B1 - B5 as output
+  // PORTB &= 0b11000001;
+  // DDRD |= 0b00110000; // D4, D5 as output
+  // PORTD &= 0b11001111; 
+  DDRB = DDRB | _BV(1) | _BV(2) | _BV(3) | _BV(4) | _BV(5); // easier readability?
+  PORTB = PORTB & ~(_BV(1) | _BV(2) | _BV(3) | _BV(4) | _BV(5));
+  DDRD = DDRD | _BV(4) | _BV(5);
+  PORTD = PORTD & ~(_BV(4) | _BV(5));
+
+  DDRC = DDRC | _BV(0) | _BV(1) | _BV(2) | _BV(3) | _BV(4);
+  PORTC = PORTC & ~(_BV(0) | _BV(1) | _BV(2) | _BV(3) | _BV(4));
+
   // pinMode(OUT_A, OUTPUT);
   // pinMode(OUT_B, OUTPUT);
   // pinMode(OUT_C, OUTPUT);
@@ -90,6 +104,7 @@ void setup() {
 
   testcount = 0.0;
   debugsetting = 0;
+  digitSelect = 0;
 
   attachInterrupt(SENS, updateCount, RISING);
   attachInterrupt(RESET, reset, RISING);
@@ -99,7 +114,7 @@ void setup() {
 
 void loop() {
   formatOutput(testcount, num);
-  displayValue(num, 0); 
+  displayValue(0); 
   // change to 1 to test other display
   // displayValue(num, 1);
 
@@ -135,8 +150,21 @@ void changeSetting() {
 }
 
 /*
+ * Cycles through digits, displaying a value specified in num
+ * displayN (0 - 1) specifies the display
+ */
+void displayValue(int displayN) {
+  int decimal = 0;
+  if(digitSelect == 1) decimal++;
+  setDemulti(digitMap[digitSelect + (displayN * N_DIGITS)]);
+  setDisplay(num[digitSelect], decimal);
+  digitSelect = (digitSelect + 1) % N_DIGITS;
+
+}
+
+/*
  *  Formats number into a 4 digit display format
- *  
+ *  An itoa function
  */
 void formatOutput(float number, char *array) {
   int truncated = (int) (number * pow(10, DECIMAL_PLACES));
@@ -146,33 +174,18 @@ void formatOutput(float number, char *array) {
   }
 }
 
-/*
- * Cycles through digits, displaying a value
- * displayN (0 - 1) specifies the display
- */
-void displayValue(char *input, int displayN) {
-  int decimal;
-  for(int i = 0; i < N_DIGITS; i++) {
-    decimal = 0;
-    setD(digitMap[i] + (displayN * N_DIGITS));
-    if(i == 1) {
-      decimal = 1;
-    }
-    setA(input[i], decimal);
-  }
-}
 
 /*
  * Sets BCD output for a digit on 7 segment display + decimal
  * Input MUST be in valid range (0 - 9)
  */
-void setA(char input, int decimal) {
+void setDisplay(char input, int decimal) {
   if(input < 10 && input >= 0) { 
     char shifted = input << BCD_OFFSET;
-    PORTD &= 0b11100000;
-    PORTD |= input;
+    PORTC = PORTC & ~(_BV(0) | _BV(1) | _BV(2) | _BV(3) | _BV(4));
+    PORTC |= input;
     if(decimal) {
-      PORTD |= 0b00010000; // Sets decimal light on
+      PORTC = PORTC | _BV(4); // Sets decimal light on
     }
   }
 }
@@ -181,10 +194,10 @@ void setA(char input, int decimal) {
  * Sets demultiplexer - Assumes that B3 - B5 are used as input
  * Input MUST be in valid range
  */
-void setD(char input) {
+void setDemulti(char input) {
   if(input < 8 && input >= 0) { 
     char shifted = input << DEM_OFFSET; // B0 - B2 are not relevant
-    PORTB &= 0b11000111; // CLEAR DEMULTI
+    PORTB = PORTB & ~(_BV(3) | _BV(4) | _BV(5)); // CLEAR DEMULTI
     PORTB |= shifted;
   }
 }
