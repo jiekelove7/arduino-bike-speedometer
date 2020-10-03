@@ -1,16 +1,19 @@
 /**
  * Basic test - Rotary not fully implemented, timer not implemented
- * This variation uses the loop to display digits
+ * Now uses timer2 for digit display!
  * Tests multiplexer + 4 digit displays
- * @version 1.4
+ * @version 1.5
  * 
  * Changelog:
  *  29/9  -   Added ability to map digits
  *  30/9  -   Adjusted various lines for easier readability
  *  1/10  -   Fixed issue where BCD was mapped to Port D instead of Port C
  *  2/10  -   Added global digit select variable - 1 digit is displayed per loop instead
+ *  3/10  -   Implementation of timer 2 do display digit instead of loop
+ *        -   Removed unnecessary comments - See v1.4 for comments if required
  */
 #include <avr/io.h>
+#include <avr/interrupt.h>
 
 #define N_DIGITS 4
 #define N_SELECT 3
@@ -50,10 +53,10 @@ const int BCD_OFFSET = OUT_A - 14;
 // Mapping of digit displays
 // Change according to map - ensure each digit [0 - 7] appears only once
 int digitMap[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-int digitSelect;
+volatile int digitSelect;
 
 // may require volatile if modified during button press instead of loop
-char num[N_DIGITS];
+volatile char num[N_DIGITS];
 volatile float testcount;
 
 // 0 - increment by 1
@@ -61,7 +64,6 @@ volatile float testcount;
 // 2 - increment by 0.01
 // 3 - increment by 0.10
 volatile int debugsetting;
-
 
 
 void setup() {
@@ -73,14 +75,8 @@ void setup() {
   pinMode(ENCB, INPUT);
   pinMode(RESET, INPUT);
   pinMode(SETTINGS, INPUT);
-
  
-
-  // DDRB |= 0b00111110; // B1 - B5 as output
-  // PORTB &= 0b11000001;
-  // DDRD |= 0b00110000; // D4, D5 as output
-  // PORTD &= 0b11001111; 
-  DDRB = DDRB | _BV(1) | _BV(2) | _BV(3) | _BV(4) | _BV(5); // easier readability?
+  DDRB = DDRB | _BV(1) | _BV(2) | _BV(3) | _BV(4) | _BV(5);
   PORTB = PORTB & ~(_BV(1) | _BV(2) | _BV(3) | _BV(4) | _BV(5));
   DDRD = DDRD | _BV(4) | _BV(5);
   PORTD = PORTD & ~(_BV(4) | _BV(5));
@@ -88,23 +84,23 @@ void setup() {
   DDRC = DDRC | _BV(0) | _BV(1) | _BV(2) | _BV(3) | _BV(4);
   PORTC = PORTC & ~(_BV(0) | _BV(1) | _BV(2) | _BV(3) | _BV(4));
 
-  // pinMode(OUT_A, OUTPUT);
-  // pinMode(OUT_B, OUTPUT);
-  // pinMode(OUT_C, OUTPUT);
-  // pinMode(OUT_D, OUTPUT);
-  // pinMode(DECIMAL, OUTPUT);
-  // pinMode(MODE_A, OUTPUT);
-  // pinMode(MODE_B, OUTPUT);
-  // pinMode(MODE_C, OUTPUT);
-  // pinMode(MODE_D, OUTPUT);
-  // pinMode(DEM_0, OUTPUT);
-  // pinMode(DEM_1, OUTPUT);
-  // pinMode(DEM_2, OUTPUT);
-  // If using pinMode, also manually set PORTs using digitalWrite();
+  cli();
+
+  // Timer 2 set up to display digit
+  // NOTICE:  Timer0 is not used because Timer0 overflow is by default in use
+  //          and thus may not compile properly
+  //          Timer0 may be used instead if compiled and downloaded to arduino
+  //          without the use of the official arduino application
+  TCCR2A = 0;
+  TCCR2B = _BV(CS21); // 8 bit prescaler - Increase prescaler to increase period
+  TIMSK2 = _BV(TOIE2); // Enables the use of timer overflow interrupt
 
   testcount = 0.0;
+  formatOutput(testcount, num);
   debugsetting = 0;
   digitSelect = 0;
+
+  sei(); // Enables interrupts
 
   attachInterrupt(SENS, updateCount, RISING);
   attachInterrupt(RESET, reset, RISING);
@@ -113,11 +109,12 @@ void setup() {
 }
 
 void loop() {
-  formatOutput(testcount, num);
+}
+
+ISR(TIMER2_OVF_vect) {
   displayValue(0); 
   // change to 1 to test other display
   // displayValue(num, 1);
-
 }
 
 void updateCount() {
@@ -133,6 +130,7 @@ void updateCount() {
       default :
         testcount += 1;
     }
+  formatOutput(testcount, num);
 }
 
 /*
