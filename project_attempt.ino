@@ -1,16 +1,20 @@
-/*
- * Attempt 1 of code for Project
+/**
+ * Code for the project
+ * 
+ * @version 1.2
+ * 
+ * Changelog:
+ *  ?/?   -   File created
+ *  ?.?   -   Basic structure created
+ *  3/10  -   Merged changes from basic_test
  */
 #include <avr/io.h>
+#include <avr/interrupt.h>
 
 #define N_DIGITS 4
 #define N_SELECT 3
 #define DECIMAL_PLACES 2
 #define DEFAULT_WHEEL_CIRCUMFERENCE 2.105
-
-
-// Set as 0 or 1
-#define DEBUG_SETTINGS 0
 
 
 // Inputs of Rotary Encoder Switch
@@ -40,51 +44,64 @@ const int DEM_0 = 11; // B3
 const int DEM_1 = 12; // B4
 const int DEM_2 = 13; // B5
 
+// Used in case the position of pins is modified
 const int DEM_OFFSET = DEM_0 - 8;
 const int BCD_OFFSET = OUT_A - 14;
 
 // Mapping of digit displays
 // Change according to map - ensure each digit [0 - 7] appears only once
 int digitMap[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+volatile int digitSelect;
 
-double circum;
+volatile double circumference;
 double velocity = 0;
 int seconds = 0;
 double distance = 0;
-char num[N_DIGITS];
+volatile char num[N_DIGITS];
 
 
 
 void setup() {
+  pinMode(SENS, INPUT);
 
-  // Sets B
-  //DDRB &= 0b11111110; // B0 as input (SENS)
-  pinMode(SENS, LOW);
-  DDRB |= 0b00111110; // B1 - B5 as output
-  PORTB &= 0b11000001;
-  DDRD |= 0b00110000; // D4, D5 as output
-  PORTD &= 0b11001111; 
-  // pinMode(OUT_A, HIGH);
-  // pinMode(OUT_B, HIGH);
-  // pinMode(OUT_C, HIGH);
-  // pinMode(OUT_D, HIGH);
-  // pinMode(DECIMAL, HIGH);
-  // pinMode(MODE_A, HIGH);
-  // pinMode(MODE_B, HIGH);
-  // pinMode(MODE_C, HIGH);
-  // pinMode(MODE_D, HIGH);
-  // pinMode(DEM_0, HIGH);
-  // pinMode(DEM_1, HIGH);
-  // pinMode(DEM_2, HIGH);
-  // If using pinMode, also manually set PORTs using digitalWrite();
+  pinMode(ENCA, INPUT);
+  pinMode(ENCB, INPUT);
+  pinMode(RESET, INPUT);
+  pinMode(SETTINGS, INPUT);
+ 
+  DDRB = DDRB | _BV(1) | _BV(2) | _BV(3) | _BV(4) | _BV(5);
+  PORTB = PORTB & ~(_BV(1) | _BV(2) | _BV(3) | _BV(4) | _BV(5));
+  DDRD = DDRD | _BV(4) | _BV(5);
+  PORTD = PORTD & ~(_BV(4) | _BV(5));
+
+  DDRC = DDRC | _BV(0) | _BV(1) | _BV(2) | _BV(3) | _BV(4);
+  PORTC = PORTC & ~(_BV(0) | _BV(1) | _BV(2) | _BV(3) | _BV(4));
+
+  cli();
+
+  // TIMER2 set up to display digit
+  // NOTICE:  TIMER0 is not used because TIMER0 overflow is by default in use
+  //          and thus may not compile properly
+  //          TIMER0 may be used instead if compiled and downloaded to arduino
+  //          without the use of the official arduino application
+  TCCR2A = 0;
+  TCCR2B = _BV(CS21); // 8 bit prescaler - Increase prescaler to increase period
+  TIMSK2 = _BV(TOIE2); // Enables the use of timer overflow interrupt
+
+  // Timer 1 set up
+  TCCR1A = 0;
+  // CS10 - CS12  :  Manages prescaler - Set to
+  TCCR1B = _BV(CS10);
+  TCNT1 = 0; // Clears Timer Count
 
 
 
+  sei();
 
+  formatOutput(0.0, num);
   circum = DEFAULT_WHEEL_CIRCUMFERENCE;
   seconds = 0;
-
-  
+  digitSelect = 0;
 
   attachInterrupt(SENS, updateSens, RISING);
   attachInterrupt(RESET, reset, RISING);
@@ -94,6 +111,15 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   
+}
+
+/*
+ * When TIMER2 overflows, a digit is displayed
+ */
+ISR(TIMER2_OVF_vect) {
+  displayValue(0); 
+  // change to 1 to test other display
+  // displayValue(num, 1);
 }
 
 void updateSens() {
@@ -108,19 +134,16 @@ void reset() {
 }
 
 /*
- * Cycles through digits, displaying a value
+ * Cycles through digits, displaying a value specified in num
  * displayN (0 - 1) specifies the display
  */
-void displayValue(char *input, int displayN) {
-  int decimal;
-  for(int i = 0; i < N_DIGITS; i++) {
-    decimal = 0;
-    setD(digitMap[i] + (displayN * N_DIGITS));
-    if(i == 1) {
-      decimal = 1;
-    }
-    setA(input[i], decimal);
-  }
+void displayValue(int displayN) {
+  int decimal = 0;
+  if(digitSelect == 1) decimal++;
+  setDemulti(digitMap[digitSelect + (displayN * N_DIGITS)]);
+  setDisplay(num[digitSelect], decimal);
+  digitSelect = (digitSelect + 1) % N_DIGITS;
+
 }
 
 /*
@@ -132,7 +155,7 @@ void changeSetting() {
 
 /*
  *  Formats number into a 4 digit display format
- *  
+ *  An itoa function
  */
 void formatOutput(float number, char *array) {
   int truncated = (int) (number * pow(10, DECIMAL_PLACES));
@@ -147,13 +170,13 @@ void formatOutput(float number, char *array) {
  * Sets BCD output for a digit on 7 segment display + decimal
  * Input MUST be in valid range (0 - 9)
  */
-void setA(char input, int decimal) {
+void setDisplay(char input, int decimal) {
   if(input < 10 && input >= 0) { 
     char shifted = input << BCD_OFFSET;
-    PORTD &= 0b11100000;
-    PORTD |= input;
+    PORTC = PORTC & ~(_BV(0) | _BV(1) | _BV(2) | _BV(3) | _BV(4));
+    PORTC |= input;
     if(decimal) {
-      PORTD |= 0b00010000; // Sets decimal light on
+      PORTC = PORTC | _BV(4); // Sets decimal light on
     }
   }
 }
@@ -162,10 +185,10 @@ void setA(char input, int decimal) {
  * Sets demultiplexer - Assumes that B3 - B5 are used as input
  * Input MUST be in valid range
  */
-void setD(char input) {
+void setDemulti(char input) {
   if(input < 8 && input >= 0) { 
     char shifted = input << DEM_OFFSET; // B0 - B2 are not relevant
-    PORTB &= 0b11000111; // CLEAR DEMULTI
+    PORTB = PORTB & ~(_BV(3) | _BV(4) | _BV(5)); // CLEAR DEMULTI
     PORTB |= shifted;
   }
 }
