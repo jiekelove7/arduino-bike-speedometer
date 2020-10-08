@@ -222,7 +222,7 @@ void changeSetting() {
  *  An itoa function
  */
 void formatOutput(float number, char *array) {
-  int truncated = (int) (number * pow(10, DECIMAL_PLACES));
+  int truncated = (int) ((number * pow(10, DECIMAL_PLACES)) + 0.01);
   for(int i = 0; i < N_DIGITS; i++) {
     array[N_DIGITS - i - 1] = truncated % 10;
     truncated = truncated / 10;
