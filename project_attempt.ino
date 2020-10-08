@@ -61,9 +61,15 @@
 const int DEM_OFFSET = DEM_0 - 8;
 const int BCD_OFFSET = OUT_A - 14;
 
-// Mapping of digit displays
-// Change according to map - ensure each digit [0 - 7] appears only once
-int digitMap[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+// Mapping of Multiplexer to display values in Port B
+// Display1 represents display on the left, Display2 represents display on the right
+// Mapping of Displays [left:right] - D1 [0:3], D2 [4:7]
+// displayMap order: {0, 1, 2, 3, 4, 5, 6, 7}
+byte displayMap[8] = {0x30, 0x38, 0x00, 0x28, 0x10, 0x20, 0x18, 0x08};
+
+// Mapping of digits to Port C 
+// digitMap Order: {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+byte digitMap[10] = {0x00, 0x01, 0x20, 0x21, 0x10, 0x11, 0x30, 0x31, 0x02, 0x03};
 volatile int digitSelect;
 
 volatile double circumference;
@@ -228,25 +234,21 @@ void formatOutput(float number, char *array) {
  * Sets BCD output for a digit on 7 segment display + decimal
  * Input MUST be in valid range (0 - 9)
  */
-void setDisplay(char input, int decimal) {
-  if(input < 10 && input >= 0) { 
-    char shifted = input << BCD_OFFSET;
-    PORTC = PORTC & ~(_BV(0) | _BV(1) | _BV(2) | _BV(3) | _BV(4));
-    PORTC |= input;
-    if(decimal) {
-      PORTC = PORTC | _BV(4); // Sets decimal light on
-    }
+void setDisplay(int input) {
+  if(input >= 0 && input <= 9) {
+    PORTC = 0;
+    PORTC = PORTC | digitMap[input];
   }
 }
 
 /*
- * Sets demultiplexer - Assumes that B3 - B5 are used as input
- * Input MUST be in valid range
+ * Sets demultiplexer - [0:7] where [0:3] is D1
+ * [4:7] is D2
+ * @param input MUST be in valid range [0:7]
  */
-void setDemulti(char input) {
-  if(input < 8 && input >= 0) { 
-    char shifted = input << DEM_OFFSET; // B0 - B2 are not relevant
-    PORTB = PORTB & ~(_BV(3) | _BV(4) | _BV(5)); // CLEAR DEMULTI
-    PORTB |= shifted;
+void setDemulti(int input) {
+  if(input >= 0 && input <= 7) {
+    PORTB = 0;
+    PORTB = PORTB | displayMap[input];
   }
 }

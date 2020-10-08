@@ -42,7 +42,7 @@ const int MODE_B = 5; // D5
 const int MODE_C = 9; // B1
 const int MODE_D = 10; // B2
 
-// Outputs to Demultiplexer
+// Outputs to Demultiplexer (NOT necessarily in order)
 const int DEM_0 = 11; // B3
 const int DEM_1 = 12; // B4
 const int DEM_2 = 13; // B5
@@ -50,9 +50,15 @@ const int DEM_2 = 13; // B5
 const int DEM_OFFSET = DEM_0 - 8;
 const int BCD_OFFSET = OUT_A - 14;
 
-// Mapping of digit displays
-// Change according to map - ensure each digit [0 - 7] appears only once
-int digitMap[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+// Mapping of Multiplexer to display values in Port B
+// Display1 represents display on the left, Display2 represents display on the right
+// Mapping of Displays [left:right] - D1 [0:3], D2 [4:7]
+// displayMap order: {0, 1, 2, 3, 4, 5, 6, 7}
+byte displayMap[8] = {0x30, 0x38, 0x00, 0x28, 0x10, 0x20, 0x18, 0x08};
+
+// Mapping of digits to Port C 
+// digitMap Order: {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+byte digitMap[10] = {0x00, 0x01, 0x20, 0x21, 0x10, 0x11, 0x30, 0x31, 0x02, 0x03};
 volatile int digitSelect;
 
 // may require volatile if modified during button press instead of loop
