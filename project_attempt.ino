@@ -10,6 +10,10 @@
  *        -   Refined comments
  *        -   Removed unecessary constants (See old vers. if required)
  *        -   Updated from using pin-read interrupt to using capture
+ *        -   Added rotary encoder support
+ *  12/10 -   Removed compare and replaced with overflow
+ *        -   Resolved soldering issues (Hardware)
+ *        -   
  */
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -102,6 +106,8 @@ volatile char num2[N_DIGITS];
 volatile int button;
 // Time counted via TIMER2 OVF of button press-down
 volatile int buttonTime;
+// How many counts to consider for holding button?
+#define BUTTON_HOLD_COUNT 1500
 // Are we changing the circumference?
 volatile int circum_mode;
 
@@ -177,7 +183,7 @@ void setup() {
 }
 
 /**
- *  Polling method of reading encoder inputs/outputs
+ *  Polling method of reading rotary encoder inputs/outputs
  */
 void loop() {
   // put your main code here, to run repeatedly:
@@ -189,15 +195,26 @@ void loop() {
     if(!ENCA && ENCA_old) {
       if(ENCB) {
         // increment
-        circumference = circumference + 0.01;
-        value[CIRC_SETTING] = circumference;
-        formatOutput(value[CIRC_SETTING], num2);
-      } else {
-        // decrement
-        if((circumference - 0.01) > 0.01) {
-          circumference = circumference - 0.01;
+        if(circum_mode) {
+          circumference = circumference + 0.01;
           value[CIRC_SETTING] = circumference;
           formatOutput(value[CIRC_SETTING], num2);
+        }
+        else {
+          // change settings
+
+        }
+      } else {
+        // decrement
+        if(circum_mode) {
+          if((circumference - 0.01) > 0.01) {
+            circumference = circumference - 0.01;
+            value[CIRC_SETTING] = circumference;
+            formatOutput(value[CIRC_SETTING], num2);
+          }
+        } else {
+          // change settings
+
         }
       }
     }
@@ -208,15 +225,32 @@ void loop() {
 }
 
 /**
- *  Button
+ *  Button pressdown from encoder. Hold and Tap performs different actions.
+ *  Hold: Enables CIRCUM mode.
+ *  Tap: Reset / End CIRCUM mode.
+ *  @see ISR(TIMER2_OVF_vect) for buttonTime counting
  */
 void buttonPress() {
   button = !button;
   if(!button) {
-    if(buttonTime > 1000) {
-      changeSetting();
+    // Hold button
+    if(buttonTime > BUTTON_HOLD_COUNT) {
+      if(!circum_mode) {
+        circum_mode = 1;
+        LED_RESET;
+        PORTD = PORTD | LEDMap[CIRC_SETTING];
+        setting = CIRC_SETTING;
+        formatOutput(value[CIRC_SETTING], num2);
+      }
+    // Tap button
     } else {
-      reset();
+      if(!circum_mode) {
+        reset();
+      } else {
+        circum_mode = 0;
+        setting = DISTANCE;
+      }
+      
     }
     buttonTime = 0;
   }
@@ -244,8 +278,8 @@ ISR(TIMER2_OVF_vect) {
 }
 
 /*
- * When TIMER1 reaches OCR1A, the bike is assumed to be idle
- * Set to 3 seconds
+ *  When TIMER1 overflows, the bike is assumed to be idle
+ *  Resets speed to show 0, refreshes capture
  */
 ISR(TIMER1_OVF_vect) {
   //
@@ -255,7 +289,7 @@ ISR(TIMER1_OVF_vect) {
 }
 
 /*
- * Input from hall sensor 
+ * Input from hall sensor. 
  */
 ISR(TIMER1_CAPT_vect) {
   //TBD
@@ -278,7 +312,7 @@ ISR(TIMER1_CAPT_vect) {
 }
 
 /*
- *  Resets distance
+ *  Resets distance back to 0.
  */ 
 void reset() {
   value[DISTANCE] = 0.0;
@@ -293,9 +327,20 @@ void reset() {
  *  Toggles value to display in num2
  *  Also changes the settings LED
  */
-void changeSetting() {
+void incrSetting() {
   setting = (setting + 1) % (N_SETTINGS - 1);
   LED_RESET; 
+  PORTD = PORTD | LEDMap[setting];
+  formatOutput(value[setting], num2);
+}
+
+/**
+ *  Toggles value to display in num2
+ *  Also changes the settings LED
+ */
+void decrSetting() {
+  setting = (setting - 1) >= 0 ? setting - 1 : N_SETTINGS - 1;
+  LED_RESET;
   PORTD = PORTD | LEDMap[setting];
   formatOutput(value[setting], num2);
 }
