@@ -1,4 +1,5 @@
 /**
+ * IGNORE THIS VERSION -- NOT USED
  * Basic test - Rotary not fully implemented, timer not implemented
  * Now uses timer2 for digit display!
  * Tests multiplexer + 4 digit displays
