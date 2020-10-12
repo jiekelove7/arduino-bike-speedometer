@@ -23,10 +23,10 @@
 #define DEFAULT_WHEEL_CIRCUMFERENCE 2.105
 
 // Mapping for array values[] (See below)
-#define N_VALUES 3
 #define DISTANCE 0
 #define SPEED_MAX 1
 #define SPEED_AVE 2
+#define CIRC_SETTING 3
 
 
 #define TIMER1_RESET    TCNT1 = 0
@@ -45,10 +45,10 @@
 
 // Outputs to BCD decoder
 // OUT_A      14  C0      lowest significant bit
-// OUT_B      15  C1
-// OUT_C      16  C2
-// OUT_D      17  C3
-// DECIMAL    18  C4
+// OUT_B      19  C5
+// OUT_C      18  C4
+// OUT_D      15  C1
+// DECIMAL    17  C3
 
 // Outputs to LED's (For mode)
 // MODE_A     2   D2
@@ -83,8 +83,8 @@ volatile double circumference;
 float speed;
 
 // Structure used to hold values
-// value = {DISTANCE, SPEED_MAX, SPEED_AVE};
-float value[N_VALUES] = {0.0, 0.0, 0.0};
+// value = {DISTANCE, SPEED_MAX, SPEED_AVE, CIRC_SETTING};
+float value[N_SETTINGS] = {0.0, 0.0, 0.0, DEFAULT_WHEEL_CIRCUMFERENCE};
 
 volatile int revolutions;
 volatile int setting;
@@ -97,6 +97,14 @@ volatile char num[N_DIGITS];
 // Number to be shown on second display
 // Shows data from value[] depending on setting
 volatile char num2[N_DIGITS];
+
+// Boolean to manage button press down and release
+volatile int button;
+// Time counted via TIMER2 OVF of button press-down
+volatile int buttonTime;
+
+// Used to poll rotary encoder
+int ENCA_old;
 
 
 void setup() {
@@ -156,25 +164,66 @@ void setup() {
   speed = 0.0;
   formatOutput(0.0, num); // Sets num to 0
   formatOutput(0.0, num2); // Sets num2 to 0
-  circumference = DEFAULT_WHEEL_CIRCUMFERENCE;
+  circumference = value[CIRC_SETTING];
   digitSelect = 0;
   revolutions = 0;
   
-  
-  setting = DISTANCE; // default
+
+  setting = DISTANCE; // default shows distance
   LED_RESET; // Clears LEDs
   PORTD = PORTD | LEDMap[setting];
 
-
+  // Interrupt for button press
+  attachInterrupt(digitalPinToInterrupt(2), buttonPress, CHANGE);
 
   capture_enabled = 0;
   sei(); // Enable interrupts
   TIMER1_RESET;
 }
 
+/**
+ *  Polling method of reading encoder inputs/outputs
+ */
 void loop() {
   // put your main code here, to run repeatedly:
+
+  if(setting == CIRC_SETTING) {
+    int ENCA = PIND & _BV(6);
+    int ENCB = PIND & _BV(4);
+
+    if(!ENCA && ENCA_old) {
+      if(ENCB) {
+        // increment
+        circumference = circumference + 0.01;
+        value[CIRC_SETTING] = circumference;
+        formatOutput(value[CIRC_SETTING], num2);
+      } else {
+        // decrement
+        if((circumference - 0.01) > 0.01) {
+          circumference = circumference - 0.01;
+          formatOutput(value[CIRC_SETTING], num2);
+        }
+      }
+    }
+    
+    ENCA_old = ENCA;
+  }
   
+}
+
+/**
+ *  Holding button changes setting, tapping resets
+ */
+void buttonPress() {
+  button = !button;
+  if(!button) {
+    if(buttonTime > 1000) {
+      changeSettings();
+    } else {
+      reset();
+    }
+    buttonTime = 0;
+  }
 }
 
 /*
@@ -192,10 +241,15 @@ ISR(TIMER2_OVF_vect) {
     setDisplay(num2[digitSelect - 4], decimal); 
   }
   digitSelect = (digitSelect + 1) % (N_DIGITS * 2);
+  // For button
+  if(button) {
+    buttonTime++;
+  }
 }
 
 /*
  * When TIMER1 reaches OCR1A, the bike is assumed to be idle
+ * Set to 3 seconds
  */
 ISR(TIMER1_COMPA_vect) {
   //
@@ -216,6 +270,8 @@ ISR(TIMER1_CAPT_vect) {
 
     value[SPEED_MAX] = speed > value[SPEED_MAX] ? speed : value[SPEED_MAX]; 
 
+    value[SPEED_AVE] = ((revolutions - 1) * value[SPEED_AVE] + speed) / revolutions;  
+
     formatOutput(speed, num);
     formatOutput(value[setting], num2);
   } else {
@@ -229,10 +285,11 @@ ISR(TIMER1_CAPT_vect) {
  *  Resets distance
  */ 
 void reset() {
-  value[DISTANCE] = 0;
+  value[DISTANCE] = 0.0;
   if(setting == DISTANCE) {
     formatOutput(value[DISTANCE], num2);
   }
+  revolutions = 0;
 }
 
 
@@ -241,9 +298,10 @@ void reset() {
  *  Also changes the settings LED
  */
 void changeSetting() {
-  setting = (setting + 1) % N_VALUES;
+  setting = (setting + 1) % N_SETTINGS;
   LED_RESET; 
   PORTD = PORTD | LEDMap[setting];
+  formatOutput(value[setting], num2);
 }
 
 /*
@@ -261,7 +319,7 @@ void formatOutput(float number, char *array) {
 
 /*
  * Sets BCD output for a digit on 7 segment display + decimal
- * Input MUST be in valid range (0 - 9)
+ * Input MUST be in valid range (0:9)
  */
 void setDisplay(int input, int decimal) {
   if(input >= 0 && input <= 9) {
