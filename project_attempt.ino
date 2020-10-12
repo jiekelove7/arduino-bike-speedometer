@@ -218,7 +218,7 @@ void buttonPress() {
   button = !button;
   if(!button) {
     if(buttonTime > 1000) {
-      changeSettings();
+      changeSetting();
     } else {
       reset();
     }
