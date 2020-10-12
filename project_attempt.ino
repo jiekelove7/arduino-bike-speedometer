@@ -201,6 +201,7 @@ void loop() {
         // decrement
         if((circumference - 0.01) > 0.01) {
           circumference = circumference - 0.01;
+          value[CIRC_SETTING] = circumference;
           formatOutput(value[CIRC_SETTING], num2);
         }
       }
