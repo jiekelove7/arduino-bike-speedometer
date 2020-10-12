@@ -102,6 +102,8 @@ volatile char num2[N_DIGITS];
 volatile int button;
 // Time counted via TIMER2 OVF of button press-down
 volatile int buttonTime;
+// Are we changing the circumference?
+volatile int circum_mode;
 
 // Used to poll rotary encoder
 int ENCA_old;
@@ -141,16 +143,8 @@ void setup() {
   TCCR1A = 0;
   TCCR1B = _BV(CS10) | _BV(CS12); // 16 bit prescaler - Set to 1024 
 
-  // Enables CTC mode comparison with OCR1A  
-  // Note that the physical pin itself is not connected for the timer
-  TCCR1B = TCCR1B | _BV(WGM12);
-
-  TIMSK1 = _BV(OCIE1A); // Enables use of timer compare interrupt
-
-  // Set the maximum count for the timer
-  // The formula is given as:   OCR1A = (Clock Frequency) / (N * (Desired Frequency)) - 1
-  //                            where N is the set prescaler {1, 8, 64, 256, 1024}
-  OCR1A = 46874; // Set to 3 seconds
+  // TIMER1 Overflow set up to trigger reset/idle
+  TIMSK1 = TIMSK1 | _BV(TOIE1);
   
   // Enables Capture mode to read input
   // ICNC1 - Noise Canceler, ICES1 - Rising edge triggered input capture
@@ -177,6 +171,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(2), buttonPress, CHANGE);
 
   capture_enabled = 0;
+  circum_mode = 0;
   sei(); // Enable interrupts
   TIMER1_RESET;
 }
@@ -213,7 +208,7 @@ void loop() {
 }
 
 /**
- *  Holding button changes setting, tapping resets
+ *  Button
  */
 void buttonPress() {
   button = !button;
@@ -234,7 +229,7 @@ void buttonPress() {
  */
 ISR(TIMER2_OVF_vect) {
   int decimal = 0;
-  if(digitSelect == 1 | digitSelect == 5) decimal++;
+  if(digitSelect == 1 | digitSelect == 5) decimal = 1;
   setDemulti(digitSelect);
   if(digitSelect < 4) {
     setDisplay(num[digitSelect], decimal);
@@ -252,7 +247,7 @@ ISR(TIMER2_OVF_vect) {
  * When TIMER1 reaches OCR1A, the bike is assumed to be idle
  * Set to 3 seconds
  */
-ISR(TIMER1_COMPA_vect) {
+ISR(TIMER1_OVF_vect) {
   //
   speed = 0.0;
   formatOutput(speed, num);
@@ -265,7 +260,7 @@ ISR(TIMER1_COMPA_vect) {
 ISR(TIMER1_CAPT_vect) {
   //TBD
   if(capture_enabled) {
-    speed = (28125 * circumference)/ ICR1; // 3.6 * ICR1-seconds factor
+    speed = (56250 * circumference)/ ICR1; // 3.6 * ICR1-seconds factor
 
     value[DISTANCE] = (++revolutions * circumference) / 1000; // Display in km
 
@@ -299,7 +294,7 @@ void reset() {
  *  Also changes the settings LED
  */
 void changeSetting() {
-  setting = (setting + 1) % N_SETTINGS;
+  setting = (setting + 1) % (N_SETTINGS - 1);
   LED_RESET; 
   PORTD = PORTD | LEDMap[setting];
   formatOutput(value[setting], num2);
