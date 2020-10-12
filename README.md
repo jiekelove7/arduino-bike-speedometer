@@ -1,2 +1,2 @@
 # bikeproj
-ENSC3020 Project for Arduino Bike Speedometer
+Arduino Bike Speedometer Project for UWA ENSC3020
