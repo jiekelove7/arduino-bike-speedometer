@@ -206,9 +206,10 @@ void loop() {
         }
       }
     }
-    
-    ENCA_old = ENCA;
   }
+  
+  ENCA_old = ENCA;
+  
   
 }
 
