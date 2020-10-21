@@ -235,16 +235,16 @@ void buttonPress() {
     // Hold button
     if(buttonTime > BUTTON_HOLD_COUNT) {
       if(!circum_mode) {
-        reset();
-      }
-    // Tap button
-    } else {
-      if(!circum_mode) {
         circum_mode = 1;
         LED_RESET;
         PORTD = PORTD | LEDMap[CIRC_SETTING];
         setting = CIRC_SETTING;
         formatOutput(value[CIRC_SETTING], num2);
+      }
+    // Tap button
+    } else {
+      if(!circum_mode) {
+        reset();
       } else {
         circum_mode = 0;
         setting = DISTANCE;
