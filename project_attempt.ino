@@ -107,7 +107,7 @@ volatile int button;
 // Time counted via TIMER2 OVF of button press-down
 volatile int buttonTime;
 // How many counts to consider for holding button?
-#define BUTTON_HOLD_COUNT 1500
+#define BUTTON_HOLD_COUNT 3000
 // Are we changing the circumference?
 volatile int circum_mode;
 
@@ -235,16 +235,16 @@ void buttonPress() {
     // Hold button
     if(buttonTime > BUTTON_HOLD_COUNT) {
       if(!circum_mode) {
+        reset();
+      }
+    // Tap button
+    } else {
+      if(!circum_mode) {
         circum_mode = 1;
         LED_RESET;
         PORTD = PORTD | LEDMap[CIRC_SETTING];
         setting = CIRC_SETTING;
         formatOutput(value[CIRC_SETTING], num2);
-      }
-    // Tap button
-    } else {
-      if(!circum_mode) {
-        reset();
       } else {
         circum_mode = 0;
         setting = DISTANCE;
