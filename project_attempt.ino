@@ -187,40 +187,39 @@ void setup() {
  */
 void loop() {
   // put your main code here, to run repeatedly:
+  int ENCA = PIND & _BV(6);
+  int ENCB = PIND & _BV(4);
 
-  if(setting == CIRC_SETTING) {
-    int ENCA = PIND & _BV(6);
-    int ENCB = PIND & _BV(4);
+  if(!ENCA && ENCA_old) {
+    if(ENCB) {
+      // increment
+      if(circum_mode) {
+        circumference = circumference + 0.01;
+        value[CIRC_SETTING] = circumference;
+        formatOutput(value[CIRC_SETTING], num2);
+      }
+      else {
+        // change settings
+        incrSetting();
 
-    if(!ENCA && ENCA_old) {
-      if(ENCB) {
-        // increment
-        if(circum_mode) {
-          circumference = circumference + 0.01;
+      }
+    } else {
+      // decrement
+      if(circum_mode) {
+        if((circumference - 0.01) > 0.01) {
+          circumference = circumference - 0.01;
           value[CIRC_SETTING] = circumference;
           formatOutput(value[CIRC_SETTING], num2);
         }
-        else {
-          // change settings
-
-        }
       } else {
-        // decrement
-        if(circum_mode) {
-          if((circumference - 0.01) > 0.01) {
-            circumference = circumference - 0.01;
-            value[CIRC_SETTING] = circumference;
-            formatOutput(value[CIRC_SETTING], num2);
-          }
-        } else {
-          // change settings
-
-        }
+        // change settings
+        decrSetting();
       }
     }
-    
-    ENCA_old = ENCA;
   }
+  
+  ENCA_old = ENCA;
+  
   
 }
 
