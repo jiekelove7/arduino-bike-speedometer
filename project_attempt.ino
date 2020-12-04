@@ -55,7 +55,7 @@
 // DECIMAL    17  C3
 
 // Outputs to LED's (For mode)
-// MODE_A     2   D2
+// MODE_A     0   D0
 // MODE_B     1   D1
 // MODE_C     5   D5
 // MODE_D     7   D7
