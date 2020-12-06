@@ -23,7 +23,7 @@ A completed Arduino project to create a speedometer that doubles as an odometer 
 Full circuit not to be included here. Transistors and demultiplexer are set up to allow for the multiplexing of the 7-segment displays. 
 
 ## Arduino Pin Mapping (More in detail in [code file](https://github.com/jiekelove7/bikeproj/blob/master/project_attempt.ino))
-Consult [datasheet](https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf) if unsure about pin mapping.
+[Datasheet](https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf) for more information.
 | Functionality  | Pin No. (0 - 19) | Port & No.       |
 | -------------  | ---------------- | ----------       |
 | Rotary Encoder | 2, 4, 6          | D2, D4, D6       |
