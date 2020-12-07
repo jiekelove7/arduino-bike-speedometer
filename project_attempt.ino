@@ -13,7 +13,7 @@
  *        -   Added rotary encoder support
  *  12/10 -   Removed compare and replaced with overflow
  *        -   Resolved soldering issues (Hardware)
- *        -   
+ *  5/12  -   Resolved Pin Mapping
  */
 #include <avr/io.h>
 #include <avr/interrupt.h>
